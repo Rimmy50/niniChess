@@ -9,10 +9,11 @@ class Board:
 
     board = {}
     whiteToMove: bool
+    halfMoves: int
+    fullMoves: int
 
-    def __init__(self, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 0", whiteToMove=True):
+    def __init__(self, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 0"):
         self.fen_to_board(fen)
-        self.whiteToMove = whiteToMove
 
     def __str__(self) -> str:
         return self.board_to_fen()
@@ -54,32 +55,45 @@ class Board:
             self.whiteToMove = False
 
         # Determines castling rights
-        # TODO
+        castling_rights = [c for c in fen_fields[2]]
 
-        # Sets enpassant targets
-        if not fen_fields == '-':
+        if not castling_rights[0] == '-':
+            for right in castling_rights:
+                if right == 'K':
+                    self.board[60].castle_king = True
+                elif right == 'Q':
+                    self.board[60].castle_queen = True
+                elif right == 'k':
+                    self.board[4].castle_king = True
+                elif right == 'q':
+                    self.board[4].castle_queen = True
+
+        # Sets enpassant target
+        if not fen_fields[3] == '-':
             file = ord(fen_fields[3][0]) - 97
             rank = fen_fields[3][1]
 
-            if rank == 3:
+            if rank == '3':
                 self.board[32 + file].is_enpassantable = True
             else:
                 self.board[24 + file].is_enpassantable = True
 
         # Sets halfmove and fullmove clocks
-        # TODO
+        self.halfMoves, self.fullMoves = int(fen_fields[4]), int(fen_fields[5])
 
     def board_to_fen(self) -> str:
         """
         Takes current position of the board and returns the position in FEN notation.
         """
 
+        fen = ''
+
+        # Computes string representing board position
+
         # Converts self.board into a list
         placeholder = [None] * 64
         for square in self.board:
             placeholder[square] = self.board[square].piece_type
-
-        fen = ''
 
         # Iterates through each rank
         for r in range(8):
@@ -104,6 +118,63 @@ class Board:
             if r != 7:
                 fen += '/'
 
+        fen += ' '
+
+        # Adds active color field
+        if self.whiteToMove:
+            fen += 'w'
+        else:
+            fen += 'b'
+
+        fen += ' '
+
+        # Adds castling rights
+        castling_rights = False
+
+        if 60 in self.board \
+            and self.board[60].piece_type == 'K':
+                if self.board[60].castle_king:
+                    fen += 'K'
+                    castling_rights = True
+                if self.board[60].castle_queen:
+                    fen += 'Q'
+                    castling_rights = True
+
+        if 4 in self.board \
+            and self.board[4].piece_type == 'k':
+                if self.board[4].castle_king:
+                    fen += 'k'
+                    castling_rights = True
+                if self.board[4].castle_queen:
+                    fen += 'q'
+                    castling_rights = True
+
+        if not castling_rights:
+            fen += '-'
+
+        fen += ' '
+
+        # Adds enpassant target
+        enpassant_exists = False
+
+        for square in range(24, 40):
+            if square in self.board \
+                    and self.board[square].is_enpassantable:
+                if square < 32:
+                    fen += chr(97 + square % 8) + str(9 - square // 8)
+                else:
+                    fen += chr(97 + square % 8) + str(7 - square // 8)
+                enpassant_exists = True
+                break
+
+        if not enpassant_exists:
+            fen += '-'
+
+        fen += ' '
+
+        # Adds halfmove and fullmove clocks
+        fen += str(self.halfMoves) + ' ' + str(self.fullMoves)
+
         return fen
 
     def legal_moves(self) -> list[(str, str)]:
@@ -125,9 +196,10 @@ class Board:
 
         return moves
 
-    # Checks if legal move includes taking opposing king. Returns True if such move is included.
     def in_check(self) -> bool:
-
+        """
+        Checks if legal moves include taking opposing king. Returns True is such move is included.
+        """
         king_pos = -1
 
         # If white to move, find position of the black king
@@ -151,4 +223,26 @@ class Board:
         return False
 
     def make_move(self, move: (int, int)) -> bool:
-        return True
+
+        # legal = self.legal_moves()
+        #
+        # if move in legal:
+        #     test_board = Board(self.board_to_fen(), self.whiteToMove)
+        #
+        #     # Currently doesn't test for enpassant
+        #     test_board.board[move[1]] = test_board.board[move[0]]
+        #     test_board.board.pop(move[0])
+        #     test_board.whiteToMove = not test_board.whiteToMove
+        #
+        #     if test_board.in_check():
+        #         return False
+        #
+        # # Implement actually making the move
+        #
+        # return True
+
+        '''
+        Implement this method to actually make the move regardless of legality
+        '''
+
+

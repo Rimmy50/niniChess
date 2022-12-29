@@ -7,8 +7,10 @@ class Piece:
     valid_directions: list[int]
     position: int
     is_enpassantable = False
+    castle_king: bool
+    castle_queen: bool
 
-    def __init__(self, piece_type: str, position: int) -> None:
+    def __init__(self, piece_type: str, position: int, castle_king=False, castle_queen=False) -> None:
         self.piece_type = piece_type
         self.position = position
 
@@ -16,6 +18,9 @@ class Piece:
 
         if new_type == 'q' or new_type == 'k':
             self.valid_directions = [1, -1, 8, -8, 7, -7, 9, -9]
+            if new_type == 'k':
+                self.castle_king = castle_king
+                self.castle_queen = castle_queen
         elif new_type == 'r':
             self.valid_directions = [1, -1, 8, -8]
         elif new_type == 'b':
@@ -54,8 +59,6 @@ class Piece:
                     moves.append(iter_pos)
                     iter_pos += direction
 
-            return [(self.position, move) for move in moves]
-
         # If the piece is a king or knight, check whether a piece of the same color is the respective legal directions
         # or whether the piece is at the edge of the board.
         if new_type == 'k' or new_type == 'n':
@@ -70,7 +73,11 @@ class Piece:
 
                     moves.append(new_pos)
 
-            return [(self.position, move) for move in moves]
+            # If king still has castling rights, add it to list of legal moves
+            if self.castle_king:
+                moves.append(self.position + 2)
+            if self.castle_queen:
+                moves.append((self.position - 3))
 
         # If the piece is a pawn, check whether forward square is unoccupied or diagonal squares are occupied by enemy
         # pieces. Also checks for enpassant.
@@ -125,4 +132,4 @@ class Piece:
                     and board[self.position - 1].is_enpassantable:
                 moves.append(self.position + self.valid_directions[0] - 1)
 
-            return [(self.position, move) for move in moves]
+        return [(self.position, move) for move in moves]
