@@ -132,22 +132,22 @@ class Board:
         castling_rights = False
 
         if 60 in self.board \
-            and self.board[60].piece_type == 'K':
-                if self.board[60].castle_king:
-                    fen += 'K'
-                    castling_rights = True
-                if self.board[60].castle_queen:
-                    fen += 'Q'
-                    castling_rights = True
+                and self.board[60].piece_type == 'K':
+            if self.board[60].castle_king:
+                fen += 'K'
+                castling_rights = True
+            if self.board[60].castle_queen:
+                fen += 'Q'
+                castling_rights = True
 
         if 4 in self.board \
-            and self.board[4].piece_type == 'k':
-                if self.board[4].castle_king:
-                    fen += 'k'
-                    castling_rights = True
-                if self.board[4].castle_queen:
-                    fen += 'q'
-                    castling_rights = True
+                and self.board[4].piece_type == 'k':
+            if self.board[4].castle_king:
+                fen += 'k'
+                castling_rights = True
+            if self.board[4].castle_queen:
+                fen += 'q'
+                castling_rights = True
 
         if not castling_rights:
             fen += '-'
@@ -177,7 +177,7 @@ class Board:
 
         return fen
 
-    def pseudolegal_moves(self) -> list[(str, str)]:
+    def pseudolegal_moves(self) -> list[(int, int)]:
         """
          Returns a list of pseudolegal moves as tuples, where the 0 index is the starting square and the 1 index is the
          final square.
@@ -196,7 +196,7 @@ class Board:
 
         return moves
 
-    def in_check(self, pseudo_moves: list[(str, str)]) -> bool:
+    def in_check(self, pseudo_moves: list[(int, int)]) -> bool:
         """
         Checks if legal moves include taking opposing king. Returns True is such move is included.
         """
@@ -222,7 +222,7 @@ class Board:
 
         return False
 
-    def make_move(self, move: (int, int), pseudo_moves: list[(str, str)]) -> bool:
+    def make_move(self, move: (int, int), pseudo_moves: list[(int, int)]) -> bool:
         """
         Returns True if move is pseudolegal and move is made. Returns False otherwise.
         """
@@ -231,11 +231,37 @@ class Board:
 
             # If move is a castling move, castle
             if self.board[move[0]].piece_type.lower() == 'k':
+
+                # Check kingside castling
                 if self.board[move[0]].castle_king and abs(move[1] - move[0]) == 2:
+
+                    # Check if castling moves through check and return False if so
+                    test_board = Board(self.board_to_fen())
+                    test_board.whiteToMove = not test_board.whiteToMove
+                    test_board_pseudo_moves = {pseudo_move[1] for pseudo_move in test_board.pseudolegal_moves()}
+                    if any({move[0] + i in test_board_pseudo_moves for i in range(3)}):
+                        return False
+
+                    # Remove castling rights
+                    self.board[move[0]].castle_king, self.board[move[0]].castle_queen = False, False
+
                     self.board[move[1]], self.board[move[1] - 1] = self.board[move[0]], self.board[move[1] + 1]
                     self.board.pop(move[0])
                     self.board.pop(move[1] + 1)
+
+                # Check queenside castling
                 elif self.board[move[0]].castle_queen and abs(move[1] - move[0]) == 2:
+
+                    # Check if castling moves through check and return False if so
+                    test_board = Board(self.board_to_fen())
+                    test_board.whiteToMove = not test_board.whiteToMove
+                    test_board_pseudo_moves = {pseudo_move[1] for pseudo_move in test_board.pseudolegal_moves()}
+                    if any({move[0] - i in test_board_pseudo_moves for i in range(3)}):
+                        return False
+
+                    # Remove castling rights
+                    self.board[move[0]].castle_king, self.board[move[0]].castle_queen = False, False
+
                     self.board[move[1]], self.board[move[1] + 1] = self.board[move[0]], self.board[move[1] - 2]
                     self.board.pop(move[0])
                     self.board.pop(move[1] - 2)
@@ -250,8 +276,37 @@ class Board:
 
             # Make normal move otherwise
             else:
+
+                # Remove respective castle rights if piece is rook
+                rook = self.board[move[0]]
+
+                if rook.piece_type.lower() == 'r':
+
+                    # If piece moved is kingside rook, remove castling rights
+                    if move[0] == 7 or move[0] == 63:
+                        for piece in self.board:
+                            if self.board[piece].piece_type.lower() == 'k' \
+                                    and self.board[piece].piece_type.islower() == rook.piece_type.islower():
+                                self.board[piece].castle_king = False
+
+                    # If piece move is queenside rook, remove castling rights
+                    if move[0] == 0 or move[0] == 56:
+                        for piece in self.board:
+                            if self.board[piece].piece_type.lower() == 'k' \
+                                    and self.board[piece].piece_type.islower() == rook.piece_type.islower():
+                                self.board[piece].castle_queen = False
+
                 self.board[move[1]] = self.board[move[0]]
                 self.board.pop(move[0])
+
+            # Reset enpassant boolean
+            for i in range(24, 40):
+                if i != move[1] \
+                        and i in self.board \
+                        and self.board[i].piece_type.lower() == 'p' \
+                        and self.board[i].is_enpassantable:
+                    self.board[i].is_enpassantable = False
+                    break
 
             # Increments fullmove clock
             if not self.whiteToMove:
