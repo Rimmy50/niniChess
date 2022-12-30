@@ -18,9 +18,9 @@ class Piece:
 
         if new_type == 'q' or new_type == 'k':
             self.valid_directions = [1, -1, 8, -8, 7, -7, 9, -9]
-            if new_type == 'k':
-                self.castle_king = castle_king
-                self.castle_queen = castle_queen
+            # if new_type == 'k':
+            #     self.castle_king = castle_king
+            #     self.castle_queen = castle_queen
         elif new_type == 'r':
             self.valid_directions = [1, -1, 8, -8]
         elif new_type == 'b':
@@ -31,6 +31,9 @@ class Piece:
             self.valid_directions = [8]
         else:
             self.valid_directions = [-8]
+
+        self.castle_king = castle_king
+        self.castle_queen = castle_queen
 
     def legal_moves(self, board: dict) -> list[(int, int)]:
 
@@ -74,10 +77,10 @@ class Piece:
                     moves.append(new_pos)
 
             # If king still has castling rights, add it to list of legal moves
-            if self.castle_king:
+            if self.castle_king and self.position + 1 not in board and self.position + 2 not in board:
                 moves.append(self.position + 2)
-            if self.castle_queen:
-                moves.append((self.position - 3))
+            if self.castle_queen and all({square not in board for square in range(self.position - 3, self.position)}):
+                moves.append((self.position - 2))
 
         # If the piece is a pawn, check whether forward square is unoccupied or diagonal squares are occupied by enemy
         # pieces. Also checks for enpassant.

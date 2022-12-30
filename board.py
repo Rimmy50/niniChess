@@ -12,7 +12,7 @@ class Board:
     halfMoves: int
     fullMoves: int
 
-    def __init__(self, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 0"):
+    def __init__(self, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"):
         self.fen_to_board(fen)
 
     def __str__(self) -> str:
@@ -25,7 +25,7 @@ class Board:
 
         fen_fields = fen.split()
 
-        # Sets pieces on te board
+        # Sets pieces on the board
         ranks = fen_fields[0].split('/')
 
         r = 0
@@ -177,10 +177,10 @@ class Board:
 
         return fen
 
-    def legal_moves(self) -> list[(str, str)]:
+    def pseudolegal_moves(self) -> list[(str, str)]:
         """
-         Returns a list of legal moves as tuples, where the 0 index is the starting square and the 1 index is the final
-         square.
+         Returns a list of pseudolegal moves as tuples, where the 0 index is the starting square and the 1 index is the
+         final square.
         """
 
         moves = []
@@ -196,7 +196,7 @@ class Board:
 
         return moves
 
-    def in_check(self) -> bool:
+    def in_check(self, pseudo_moves: list[(str, str)]) -> bool:
         """
         Checks if legal moves include taking opposing king. Returns True is such move is included.
         """
@@ -216,33 +216,85 @@ class Board:
 
         # If the position of the king is included as a destination square in the list of legal moves, said king is
         # under check
-        for move in self.legal_moves():
+        for move in pseudo_moves:
             if move[1] == king_pos:
                 return True
 
         return False
 
-    def make_move(self, move: (int, int)) -> bool:
+    def make_move(self, move: (int, int), pseudo_moves: list[(str, str)]) -> bool:
+        """
+        Returns True if move is pseudolegal and move is made. Returns False otherwise.
+        """
 
-        # legal = self.legal_moves()
-        #
-        # if move in legal:
-        #     test_board = Board(self.board_to_fen(), self.whiteToMove)
-        #
-        #     # Currently doesn't test for enpassant
-        #     test_board.board[move[1]] = test_board.board[move[0]]
-        #     test_board.board.pop(move[0])
-        #     test_board.whiteToMove = not test_board.whiteToMove
-        #
-        #     if test_board.in_check():
-        #         return False
-        #
-        # # Implement actually making the move
-        #
-        # return True
+        if move in pseudo_moves:
 
-        '''
-        Implement this method to actually make the move regardless of legality
-        '''
+            # If move is a castling move, castle
+            if self.board[move[0]].piece_type.lower() == 'k':
+                if self.board[move[0]].castle_king and abs(move[1] - move[0]) == 2:
+                    self.board[move[1]], self.board[move[1] - 1] = self.board[move[0]], self.board[move[1] + 1]
+                    self.board.pop(move[0])
+                    self.board.pop(move[1] + 1)
+                elif self.board[move[0]].castle_queen and abs(move[1] - move[0]) == 2:
+                    self.board[move[1]], self.board[move[1] + 1] = self.board[move[0]], self.board[move[1] - 2]
+                    self.board.pop(move[0])
+                    self.board.pop(move[1] - 2)
 
+            # If move is enpassant, do enpassant
+            elif self.board[move[0]].piece_type.lower() == 'p' \
+                    and move[1] not in self.board \
+                    and abs(move[1] % 8 - move[0] % 8) == 1:
+                self.board[move[1]] = self.board[move[0]]
+                self.board.pop(move[1] - self.board[move[0]].valid_directions[0])
+                self.board.pop(move[0])
 
+            # Make normal move otherwise
+            else:
+                self.board[move[1]] = self.board[move[0]]
+                self.board.pop(move[0])
+
+            # Increments fullmove clock
+            if not self.whiteToMove:
+                self.fullMoves += 1
+
+            # Switches active color
+            self.whiteToMove = not self.whiteToMove
+
+            # Increments/resets halfmove clock
+            if abs(move[1] - move[0]) == 16 and self.board[move[1]].piece_type.lower() == 'p':
+                self.halfMoves = 0
+            else:
+                self.halfMoves += 1
+
+            return True
+
+        else:
+
+            return False
+
+    def check_move_legality(self, move: (int, int), make_move=False) -> bool:
+        """
+        Checks if move is legal and returns True if so. If make_move is True and move is legal, move is also made.
+        """
+
+        # Create a test board
+        test_board = Board(self.board_to_fen())
+
+        # If move is pseudolegal, move is made on test_board
+        is_move_pseudolegal = test_board.make_move(move, test_board.pseudolegal_moves())
+
+        # If move is pseudolegal, check if test_board is in check. If in check, pseudolegal move is not legal move
+        if is_move_pseudolegal:
+            in_check = test_board.in_check(test_board.pseudolegal_moves())
+
+            # If make_move is true and move is legal, make the move on self
+            if not in_check and make_move:
+                self.board = test_board.board
+                self.whiteToMove = test_board.whiteToMove
+                self.halfMoves = test_board.halfMoves
+                self.fullMoves = test_board.fullMoves
+                return True
+            else:
+                return not in_check
+        else:
+            return False
